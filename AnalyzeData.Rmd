@@ -1,0 +1,135 @@
+---
+title: "Practicum 2 CS5200 - Explore and Mine Data"
+author: "Shaoyujie(Fiona) Chen (chen.shaoy@northeastern.edu), Yunke Li (li.yunke@northeastern.edu)"
+date: "Summer Full 2023"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Load Required Libraries & clear environment
+```{r loadRequiredLibraries, warning = F}
+# Required Package names
+packages <- c("RMySQL", "DBI")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages], quiet = TRUE)
+}
+
+# Packages loading
+suppressMessages(invisible(lapply(packages, library, character.only = TRUE)))
+
+# Remove all objects to clear environment
+rm(list = ls())
+```
+
+
+### Connect to Database
+```{r connectToMySqlDatabase, warning = F}
+mysqldb <-  dbConnect(RMySQL::MySQL(),
+                      user = 'sql9638212',
+                      password = 'bpz4ZNVWs9',
+                      dbname = 'sql9638212',
+                      host = 'sql9.freemysqlhosting.net',
+                      port = 3306)
+```
+
+
+## Introduction
+This report presents an analysis of sales data from the fact tables of MySQL data warehouse. The aim is to provide insights into top sales representatives and total sales per month.
+
+
+## Analytical Query I
+**Top five sales reps with the most sales broken down by year.**  
+The following query retrieves the top five sales representatives with the most sales, broken down by year.  
+```{sql queryITopFiveReps, connection=mysqldb, warning=FALSE}
+SELECT year, repID, firstName, lastName, territory, SUM(totalSold) AS totalSold
+FROM rep_facts
+GROUP BY Year, repID
+ORDER BY Year, totalSold DESC
+LIMIT 5;
+```
+The table above displays the top five sales representatives for the year 2020, along with their respective territories and total sales amounts. From the data, we can observe the following:  
+
+**South America Dominance:** The top sales representative for 2020 is Walison da Silva from the South America territory, achieving a remarkable total sales amount of $5,397,929.  
+
+**West Dominance:** Among the top representatives, Aneeta Kappoorthy stands out in the West territory, contributing significantly to the overall sales with a total of $4,032,183.  
+
+**East Dominance:** Lynette McRowe from the East territory demonstrates consistent performance, securing a spot among the top representatives with total sales of $2,770,588.  
+
+**EMEA Contribution:** The EMEA territory is well represented by Helmut Schwab and Prasad Patel, both achieving notable total sales figures of $2,031,307 and $1,999,163, respectively.  
+
+These findings shed light on the sales performance of representatives across various territories in the year 2020. It is evident that individuals from different regions have made substantial contributions to the overall sales, and their efforts have been crucial to the company's success during this period.  
+
+
+## Analytical Query II
+**Total sold per month in a line graph visualization.**  
+This query calculates the total sales per month and is visualized in the line graph below.
+```{sql queryIIMonthSoldTable, connection=mysqldb, warning=FALSE}
+SELECT Year, Month, SUM(totalSold) AS totalSold
+FROM rep_facts
+GROUP BY Year, Month
+ORDER BY Year, Month;
+```
+
+```{r queryIIMonthSoldPlot, warning=F}
+# Save query results
+query <- "
+  SELECT Year, Month, SUM(totalSold) AS totalSold
+  FROM rep_facts
+  GROUP BY Year, Month
+  ORDER BY Year, Month;
+"
+
+results <- dbGetQuery(mysqldb, query)
+
+# Convert Year and Month to a Date format
+results$Date <- as.Date(paste(results$Year, results$Month, "01", sep = "-"))
+
+
+# Create a line plot with default x-axis labels
+plot(results$Date, results$totalSold, type = "l", xlab = "", ylab = "Total Sold",
+    col = "blue", lwd = 3, xaxt = "n", ylim = c(800000, 1800000))
+
+# Add data labels
+text(results$Date, results$totalSold, labels = results$totalSold, pos = 3, cex = 0.8)
+
+# Highlight points using red circles
+points(results$Date, results$totalSold, col = "black", pch = 16)
+
+# Customize x-axis labels to include year and month
+months <- format(results$Date, "%b")
+years <- format(results$Date, "%Y")
+labels <- paste(months, years, sep = " ")
+axis(1, at = results$Date, labels = labels, las = 2)
+
+# Add a legend
+legend("topleft", legend = "Total Sold", fill = "blue", border = NA, cex = 0.7)
+
+# Add a title
+title(main = "Total Sold per Month", font.main = 1, cex.main = 1.1)
+
+```
+
+From the data and line chart, we can observe the following trends:  
+
+**Peak Sales Month:** The month with the highest total sales in the year 2020 was October, contributing a total sales amount of $1,717,102.  
+
+**Lowest Sales Month:** Conversely, the month with the lowest total sales was January, with total sales of $823,207.  
+
+**Average Monthly Sales:** The average monthly sales for the year 2020 were approximately $1,475,942.  
+
+Except for January and December, the sales for the remaining months have maintained at a relatively high level. This might be due to the influence of holidays, resulting in lower sales during the winter season.  
+
+These findings provide insights into the monthly sales performance throughout the year 2020. It is evident that there were variations in sales across different months, with notable peaks and troughs. These fluctuations may be influenced by factors such as seasonal trends, marketing initiatives, or external economic conditions.
+
+
+
+
+
+## Disconnect from database
+```{r disconnectFromMySqlDatabase, warning = F}
+dbDisconnect(mysqldb)
+```
